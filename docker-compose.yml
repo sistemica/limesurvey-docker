@@ -4,8 +4,6 @@ services:
     restart: always
     depends_on:
       - db
-    ports:
-      - "8080:9000"
     environment:
       - DB_TYPE=mysql
       - DB_HOST=db
@@ -17,9 +15,13 @@ services:
       - ADMIN_PASSWORD=my_secure_password
       - ADMIN_NAME=Administrator
       - ADMIN_EMAIL=admin@example.com
+      # URL configuration
+      - BASE_URL=
+      - PUBLIC_URL=http://localhost:8009
+      - URL_FORMAT=path
+      - SHOW_SCRIPT_NAME=false
     volumes:
-      - limesurvey-upload:/var/www/html/upload
-      - limesurvey-config:/var/www/html/application/config
+      - limesurvey-data:/var/www/html
 
   db:
     image: mysql:8.0
@@ -31,18 +33,18 @@ services:
       - MYSQL_PASSWORD=limesurvey_password
     volumes:
       - db-data:/var/lib/mysql
-      
+
   webserver:
     image: nginx:alpine
     restart: always
     ports:
-      - "8081:80"
+      - "8009:80"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - limesurvey-data:/var/www/html
     depends_on:
       - limesurvey
 
 volumes:
-  limesurvey-upload:
-  limesurvey-config:
+  limesurvey-data:
   db-data:

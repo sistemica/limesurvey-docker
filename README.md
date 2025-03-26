@@ -15,16 +15,12 @@ docker pull ghcr.io/sistemica/limesurvey-docker:latest
 Create a `docker-compose.yml` file:
 
 ```yaml
-version: '3'
-
 services:
   limesurvey:
     image: ghcr.io/sistemica/limesurvey-docker:latest
     restart: always
     depends_on:
       - db
-    ports:
-      - "8080:9000"
     environment:
       - DB_TYPE=mysql
       - DB_HOST=db
@@ -36,9 +32,13 @@ services:
       - ADMIN_PASSWORD=my_secure_password
       - ADMIN_NAME=Administrator
       - ADMIN_EMAIL=admin@example.com
+      # URL configuration
+      - BASE_URL=
+      - PUBLIC_URL=http://localhost:8009
+      - URL_FORMAT=path
+      - SHOW_SCRIPT_NAME=false
     volumes:
-      - limesurvey-upload:/var/www/html/upload
-      - limesurvey-config:/var/www/html/application/config
+      - limesurvey-data:/var/www/html
 
   db:
     image: mysql:8.0
@@ -50,20 +50,20 @@ services:
       - MYSQL_PASSWORD=limesurvey_password
     volumes:
       - db-data:/var/lib/mysql
-      
+
   webserver:
     image: nginx:alpine
     restart: always
     ports:
-      - "80:80"
+      - "8009:80"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - limesurvey-data:/var/www/html
     depends_on:
       - limesurvey
 
 volumes:
-  limesurvey-upload:
-  limesurvey-config:
+  limesurvey-data:
   db-data:
 ```
 
@@ -72,13 +72,31 @@ Create an `nginx.conf` file:
 ```nginx
 server {
     listen 80;
-    server_name localhost;
 
-    location / {
-        proxy_pass http://limesurvey:9000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+    # Set the root directory where all files will be served from
+    root /var/www/html;
+    index index.php;
+
+    # Handle PHP files
+    location ~ \.php$ {
+        fastcgi_pass limesurvey:9000;
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_intercept_errors on;
+        fastcgi_buffer_size 16k;
+        fastcgi_buffers 4 16k;
     }
+
+    # For any non-PHP file, try the exact file first then try the directory,
+    # and finally fall back to index.php (which will execute LimeSurvey's router)
+    location / {
+        try_files $uri $uri/ /index.php$is_args$args;
+    }
+
+    # Basic settings
+    client_max_body_size 100M;
+    server_tokens off;
 }
 ```
 
@@ -88,7 +106,7 @@ Then start the containers:
 docker compose up -d
 ```
 
-Access LimeSurvey at http://localhost
+Access LimeSurvey at http://localhost:8009
 
 ## Environment Variables
 
@@ -138,10 +156,9 @@ Access LimeSurvey at http://localhost
 
 ## Volumes
 
-It's recommended to mount these volumes for data persistence:
+For data persistence, the following volumes are used:
 
-- `/var/www/html/upload`: Contains all survey uploads
-- `/var/www/html/application/config`: Contains configuration files, including security.php
+- `limesurvey-data:/var/www/html`: Contains all LimeSurvey files including uploads and configuration
 
 ## Updating LimeSurvey Version
 
