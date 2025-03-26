@@ -1,0 +1,48 @@
+services:
+  limesurvey:
+    image: ghcr.io/sistemica/limesurvey-docker:latest
+    restart: always
+    depends_on:
+      - db
+    ports:
+      - "8080:9000"
+    environment:
+      - DB_TYPE=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_NAME=limesurvey
+      - DB_USERNAME=limesurvey
+      - DB_PASSWORD=limesurvey_password
+      - ADMIN_USER=admin
+      - ADMIN_PASSWORD=my_secure_password
+      - ADMIN_NAME=Administrator
+      - ADMIN_EMAIL=admin@example.com
+    volumes:
+      - limesurvey-upload:/var/www/html/upload
+      - limesurvey-config:/var/www/html/application/config
+
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=limesurvey
+      - MYSQL_USER=limesurvey
+      - MYSQL_PASSWORD=limesurvey_password
+    volumes:
+      - db-data:/var/lib/mysql
+      
+  webserver:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - limesurvey
+
+volumes:
+  limesurvey-upload:
+  limesurvey-config:
+  db-data:
